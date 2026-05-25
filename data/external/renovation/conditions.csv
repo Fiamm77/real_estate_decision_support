@@ -1,0 +1,7 @@
+﻿Kulcs;Leírás
+1;erősen hibás, súlyos vagy veszélyes állapotot jelöl, azonnali beavatkozást igényel, a szerkezet nem javítható, csak csere lehetséges
+2;erősen hibás vagy súlyos állapotot jelöl, azonnali beavatkozást igényel, a szerkezet javítható csere nélkül
+3;kisebb hibákkal terhelt állapotot jelöl, 1-3 éven belüli karbantartás szükséges
+4;jó állapotot jelöl, amely nem újszerű, 5-10 éven belüli karbantartást igényel
+5;újszerű, vagy károsodásmentes állapotot jelöl
+6;felújított

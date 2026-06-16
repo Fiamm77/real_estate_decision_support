@@ -1,0 +1,7 @@
+﻿metric;value
+land_score_mae;0.22320225942428654
+land_score_rmse;0.2731864831452692
+land_score_r2;0.11946386555473731
+building_score_mae;0.23881067910432954
+building_score_rmse;0.28794125021846123
+building_score_r2;-0.015952935789722122

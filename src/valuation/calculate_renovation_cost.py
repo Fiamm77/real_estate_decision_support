@@ -1,235 +1,131 @@
-import pandas as pd
+"""Renovation cost calculation API."""
 
-from sqlalchemy import create_engine
+try:
+    from .config import (
+        CONDITIONS_TABLE,
+        NON_RENOVATABLE_CONDITION,
+        PACKAGES_TABLE,
+        PACKAGE_WORKS_TABLE,
+        RENOVATION_MULTIPLIER,
+        WORK_COST_COLUMN,
+        WORK_IDS_COLUMN,
+        WORK_NAME_COLUMN,
+        WORKS_TABLE,
+    )
+    from .core import read_table
+except ImportError:
+    from config import (
+        CONDITIONS_TABLE,
+        NON_RENOVATABLE_CONDITION,
+        PACKAGES_TABLE,
+        PACKAGE_WORKS_TABLE,
+        RENOVATION_MULTIPLIER,
+        WORK_COST_COLUMN,
+        WORK_IDS_COLUMN,
+        WORK_NAME_COLUMN,
+        WORKS_TABLE,
+    )
+    from core import read_table
 
-# =====================================================
-# DATABASE CONNECTION
-# =====================================================
 
-engine = create_engine(
-    "postgresql+psycopg2://postgres:postgres@localhost:5432/real_estate"
-)
+conditions_df = read_table(CONDITIONS_TABLE)
+packages_df = read_table(PACKAGES_TABLE)
+package_works_df = read_table(PACKAGE_WORKS_TABLE)
+works_df = read_table(WORKS_TABLE)
 
-# =====================================================
-# LOAD TABLES
-# =====================================================
 
-conditions_df = pd.read_sql(
-    "SELECT * FROM conditions",
-    engine
-)
+def _empty_result(renovation_possible):
+    return {
+        "total_cost": 0,
+        "package_ids": [],
+        "works": [],
+        "renovation_possible": renovation_possible,
+    }
 
-packages_df = pd.read_sql(
-    "SELECT * FROM packages",
-    engine
-)
 
-package_works_df = pd.read_sql(
-    "SELECT * FROM package_works",
-    engine
-)
+def _find_package(from_condition, to_condition):
+    package_match = packages_df[
+        (packages_df["from"] == from_condition)
+        & (packages_df["to"] == to_condition)
+    ]
 
-works_df = pd.read_sql(
-    "SELECT * FROM works",
-    engine
-)
+    if package_match.empty:
+        return None
 
-print("Tables loaded successfully!")
+    return package_match.iloc[0]["Kulcs"]
 
-# =====================================================
-# CALIBRATION
-# =====================================================
 
-RENOVATION_MULTIPLIER = 4
+def _work_ids_for_package(package_id):
+    return package_works_df[
+        package_works_df["Csomag"] == package_id
+    ][WORK_IDS_COLUMN].tolist()
 
-# =====================================================
-# RENOVATION COST FUNCTION
-# =====================================================
+
+def _works_for_ids(work_ids):
+    selected_works = works_df[works_df["Index"].isin(work_ids)].copy()
+    selected_works[WORK_COST_COLUMN] = (
+        selected_works[WORK_COST_COLUMN]
+        .astype(str)
+        .str.replace(",", ".")
+        .astype(float)
+    )
+    return selected_works
+
+
+def _calculate_work_costs(selected_works, building_area_m2):
+    selected_works["total_work_cost"] = (
+        selected_works[WORK_COST_COLUMN] * building_area_m2
+    )
+    return selected_works
+
 
 def calculate_renovation_cost(
     current_condition,
     target_condition,
-    building_area_m2
+    building_area_m2,
 ):
-
-    # =================================================
-    # SKIP NON-RENOVATABLE PROPERTIES
-    # =================================================
-
-    if current_condition == 1:
-
-        return {
-            "total_cost": 0,
-            "package_ids": [],
-            "works": [],
-            "renovation_possible": False
-        }
-
-    # =================================================
-    # NO RENOVATION NEEDED
-    # =================================================
+    if current_condition == NON_RENOVATABLE_CONDITION:
+        return _empty_result(renovation_possible=False)
 
     if current_condition >= target_condition:
-
-        return {
-            "total_cost": 0,
-            "package_ids": [],
-            "works": [],
-            "renovation_possible": True
-        }
-
-    # =================================================
-    # INITIALIZE
-    # =================================================
+        return _empty_result(renovation_possible=True)
 
     total_cost = 0
-
     collected_works = []
-
     package_ids = []
 
-    # =================================================
-    # LOOP THROUGH CONDITION STEPS
-    # =================================================
-
-    for condition_step in range(
-        current_condition,
-        target_condition
-    ):
-
+    for condition_step in range(current_condition, target_condition):
         from_condition = condition_step
-
         to_condition = condition_step + 1
+        package_id = _find_package(from_condition, to_condition)
 
-        # =============================================
-        # FIND PACKAGE
-        # =============================================
-
-        package_match = packages_df[
-            (
-                packages_df["from"]
-                == from_condition
-            )
-            &
-            (
-                packages_df["to"]
-                == to_condition
-            )
-        ]
-
-        if package_match.empty:
-
+        if package_id is None:
             continue
 
-        package_id = (
-            package_match.iloc[0]["Kulcs"]
-        )
+        package_ids.append(int(package_id))
+        work_ids = _work_ids_for_package(package_id)
+        selected_works = _works_for_ids(work_ids)
+        selected_works = _calculate_work_costs(selected_works, building_area_m2)
 
-        package_ids.append(
-            int(package_id)
-        )
+        total_cost += selected_works["total_work_cost"].sum()
+        collected_works.extend(selected_works[WORK_NAME_COLUMN].tolist())
 
-        # =============================================
-        # FIND WORK IDS
-        # =============================================
-
-        work_ids = package_works_df[
-            package_works_df["Csomag"]
-            == package_id
-        ]["Munkák"].tolist()
-
-        # =============================================
-        # FILTER WORKS
-        # =============================================
-
-        selected_works = works_df[
-            works_df["Index"].isin(work_ids)
-        ].copy()
-
-        # =============================================
-        # CLEAN COST COLUMN
-        # =============================================
-
-        selected_works[
-            "Med Ft/nm (2024)"
-        ] = (
-            selected_works[
-                "Med Ft/nm (2024)"
-            ]
-            .astype(str)
-            .str.replace(",", ".")
-            .astype(float)
-        )
-
-        # =============================================
-        # CALCULATE WORK COSTS
-        # =============================================
-
-        selected_works["total_work_cost"] = (
-            selected_works[
-                "Med Ft/nm (2024)"
-            ]
-            * building_area_m2
-        )
-
-        # =============================================
-        # AGGREGATE COST
-        # =============================================
-
-        step_cost = (
-            selected_works[
-                "total_work_cost"
-            ].sum()
-        )
-
-        total_cost += step_cost
-
-        # =============================================
-        # COLLECT WORK NAMES
-        # =============================================
-
-        collected_works.extend(
-            selected_works[
-                "Munkamenet"
-            ].tolist()
-        )
-
-    # =================================================
-    # REMOVE DUPLICATE WORKS
-    # =================================================
-
-    collected_works = list(
-        set(collected_works)
-    )
-
-    # =================================================
-    # APPLY CALIBRATION MULTIPLIER
-    # =================================================
-
+    collected_works = list(set(collected_works))
     total_cost *= RENOVATION_MULTIPLIER
-
-    # =================================================
-    # RETURN RESULTS
-    # =================================================
 
     return {
         "total_cost": round(total_cost, 0),
         "package_ids": package_ids,
         "works": collected_works,
-        "renovation_possible": True
+        "renovation_possible": True,
     }
 
 
-# =====================================================
-# MANUAL TEST
-# =====================================================
-
 if __name__ == "__main__":
-
     result = calculate_renovation_cost(
         current_condition=2,
         target_condition=5,
-        building_area_m2=100
+        building_area_m2=100,
     )
 
     print(result)

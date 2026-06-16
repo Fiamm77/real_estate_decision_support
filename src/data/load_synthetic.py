@@ -6,12 +6,42 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 # --- PATHS ---
-DATA_PATH = BASE_DIR / "data" / "synthetic" / "real_estate_synthetic.csv"
+SYNTHETIC_DIR = BASE_DIR / "data" / "synthetic"
+DATA_PATH = SYNTHETIC_DIR / "real_estate_synthetic.csv"
+
+BASE_COLUMNS = [
+    "property_id",
+    "activation_year",
+    "building_value",
+    "land_value",
+    "renovation_cost",
+    "property_type",
+    "land_area_m2",
+    "building_area_m2",
+    "condition",
+    "settlement_type",
+    "city",
+    "county",
+    "annual_cost",
+]
+
 
 # --- LOAD DATA ---
-df = pd.read_csv(DATA_PATH, sep=";")
+data_path = DATA_PATH
+df = pd.read_csv(data_path, sep=";")
 
+missing_columns = [column for column in BASE_COLUMNS if column not in df.columns]
+if missing_columns:
+    raise ValueError(
+        "Synthetic input is missing required columns: "
+        + ", ".join(missing_columns)
+    )
+
+df = df[BASE_COLUMNS].copy()
+
+print(f"Loaded file: {data_path}")
 print(f"Loaded rows: {len(df)}")
+print(f"Condition values: {sorted(df['condition'].dropna().unique())}")
 
 # --- POSTGRES CONNECTION ---
 engine = create_engine(

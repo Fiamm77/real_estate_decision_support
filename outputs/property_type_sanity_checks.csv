@@ -1,0 +1,9 @@
+﻿check;value
+apartments_land_area_zero_rate;1.0
+apartments_land_score_neutral_rate;1.0
+apartments_structural_equals_building_rate;1.0
+houses_positive_land_area_rate;1.0
+houses_structural_matches_30_70_rate;1.0
+houses_land_score_structural_corr;0.5150178836342435
+houses_building_score_structural_corr;0.8663071207138259
+houses_land_value_ratio_structural_corr;-0.22219710118717717

@@ -99,8 +99,7 @@ Load data into SQL:
 
 ```powershell
 venv\Scripts\python.exe src\data\load_synthetic.py
-venv\Scripts\python.exe src\data\load_ksh_avg_prices
-venv\Scripts\python.exe "src\data\load_renovation data.py"
+venv\Scripts\python.exe src\data\load_ksh_avg_prices.py
 ```
 
 Train the valuation model:
@@ -160,7 +159,6 @@ Data quality checks:
 - settlement type and county distribution,
 - land area and building area distributions,
 - land value distribution,
-- renovation cost distribution,
 - KSH benchmark availability.
 
 Drift detection:

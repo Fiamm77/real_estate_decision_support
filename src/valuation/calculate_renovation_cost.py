@@ -28,10 +28,16 @@ except ImportError:
     from core import read_table
 
 
-conditions_df = read_table(CONDITIONS_TABLE)
-packages_df = read_table(PACKAGES_TABLE)
-package_works_df = read_table(PACKAGE_WORKS_TABLE)
-works_df = read_table(WORKS_TABLE)
+def _load_renovation_tables():
+    try:
+        return {
+            "conditions": read_table(CONDITIONS_TABLE),
+            "packages": read_table(PACKAGES_TABLE),
+            "package_works": read_table(PACKAGE_WORKS_TABLE),
+            "works": read_table(WORKS_TABLE),
+        }
+    except Exception:
+        return None
 
 
 def _empty_result(renovation_possible):
@@ -43,7 +49,7 @@ def _empty_result(renovation_possible):
     }
 
 
-def _find_package(from_condition, to_condition):
+def _find_package(packages_df, from_condition, to_condition):
     package_match = packages_df[
         (packages_df["from"] == from_condition)
         & (packages_df["to"] == to_condition)
@@ -55,13 +61,13 @@ def _find_package(from_condition, to_condition):
     return package_match.iloc[0]["Kulcs"]
 
 
-def _work_ids_for_package(package_id):
+def _work_ids_for_package(package_works_df, package_id):
     return package_works_df[
         package_works_df["Csomag"] == package_id
     ][WORK_IDS_COLUMN].tolist()
 
 
-def _works_for_ids(work_ids):
+def _works_for_ids(works_df, work_ids):
     selected_works = works_df[works_df["Index"].isin(work_ids)].copy()
     selected_works[WORK_COST_COLUMN] = (
         selected_works[WORK_COST_COLUMN]
@@ -90,6 +96,14 @@ def calculate_renovation_cost(
     if current_condition >= target_condition:
         return _empty_result(renovation_possible=True)
 
+    tables = _load_renovation_tables()
+    if tables is None:
+        return _empty_result(renovation_possible=True)
+
+    packages_df = tables["packages"]
+    package_works_df = tables["package_works"]
+    works_df = tables["works"]
+
     total_cost = 0
     collected_works = []
     package_ids = []
@@ -97,14 +111,14 @@ def calculate_renovation_cost(
     for condition_step in range(current_condition, target_condition):
         from_condition = condition_step
         to_condition = condition_step + 1
-        package_id = _find_package(from_condition, to_condition)
+        package_id = _find_package(packages_df, from_condition, to_condition)
 
         if package_id is None:
             continue
 
         package_ids.append(int(package_id))
-        work_ids = _work_ids_for_package(package_id)
-        selected_works = _works_for_ids(work_ids)
+        work_ids = _work_ids_for_package(package_works_df, package_id)
+        selected_works = _works_for_ids(works_df, work_ids)
         selected_works = _calculate_work_costs(selected_works, building_area_m2)
 
         total_cost += selected_works["total_work_cost"].sum()

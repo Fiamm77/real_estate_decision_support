@@ -19,7 +19,6 @@ Beletartozik:
 - SQL-alapu adatkezeles PostgreSQL es SQLAlchemy hasznalataval.
 - Aktualis ingatlanertek predikcioja.
 - Felujitas utani ingatlanertek predikcioja.
-- Felujitasi koltseg becslese.
 - SHAP-alapu lokalis magyarazatok.
 - RAG-szeru szoveges magyarazat domain szabalyok es modellkimenetek alapjan.
 - Streamlit alapu megjelenites.
@@ -33,15 +32,15 @@ Nem tartozik bele:
 
 ## Architektura
 
-1. Az ingatlan-, KSH- es felujitasi adatok CSV fajlokbol PostgreSQL tablaba
+1. Az ingatlan- es KSH adatok CSV fajlokbol PostgreSQL tablaba
    kerulnek.
 2. A predikcios modell a strukturalt ingatlanjellemzokbol becsul egy
    asset ertekproxyt.
 3. A KSH telepulesi vagy teruleti fajlagos ar kulon piaci benchmarkkent
    jelenik meg. A modellkimenet es a KSH benchmark aranya interpretacios
    mutato, nem tanitasi target.
-4. A felujitas utani szcenarioban a rendszer celallapotra szamolja a
-   felujitasi koltseget, majd ujra becsli az ingatlan erteket.
+4. A felujitas utani szcenarioban a rendszer celallapotra ujraprediktalja
+   az ingatlan strukturalt score-jat, majd ujra becsli az ingatlan erteket.
 5. A magyarazati reteg a predikcios eredmenyeket, SHAP feature hatasokat es
    domain szabalyokat kapcsol ossze.
 6. A Streamlit felulet a predikciokat, felujitasi szcenariot es magyarazatot
@@ -257,9 +256,7 @@ Adatok betoltese:
 
 ```powershell
 python src/data/load_synthetic.py
-python src/data/load_ksh_avg_prices
-python "src/data/load_renovation data.py"
-python src/data/load_ksh_social.py
+python src/data/load_ksh_avg_prices.py
 ```
 
 Modell tanitasa:

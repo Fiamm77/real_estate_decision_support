@@ -1,86 +1,93 @@
-# AI-Assisted Real Estate Valuation System
+# AI-assisted Real Estate Valuation System
 
-This repository is the thesis project workspace for a real-estate decision
-support system. Some earlier assignments support the broader thesis scope.
+This repository contains an AI-assisted real-estate valuation system developed for the MLOps course assignment.
 
-The current MLOps assignment uses only a focused subset of the repository:
+The project is a focused assignment version of a broader real-estate decision support research direction. Portfolio scoring, TOPSIS ranking and strategic decision-support modules are intentionally excluded from this repository.
 
-- SQL-based property data handling
-- current market value prediction
-- renovated market value prediction
-- renovation cost estimation
-- SHAP and RAG-style explanation
-- Streamlit presentation layer
-- MLOps documentation
+## Assignment Scope
 
-The portfolio decision/scoring layer is intentionally out of scope for the
-current assignment and remains relevant for the thesis.
+The system demonstrates:
 
-## MLOps Assignment Scope
+- SQL-based property data handling with PostgreSQL,
+- synthetic real-estate data loading,
+- KSH benchmark price loading,
+- Random Forest based structural score prediction,
+- current market value estimation,
+- post-renovation market value scenario estimation,
+- SHAP-based local model explanation,
+- RAG-style textual explanation,
+- Streamlit-based user interface,
+- MLOps documentation, audit outputs and versioning strategy.
 
-Included modules:
+Out of scope:
 
-- `src/data`: CSV to PostgreSQL loaders and database inspection helpers
-- `src/valuation`: valuation model, renovation calculation and prediction pipeline
-- `src/rag`: lightweight retrieval-augmented explanation layer
-- `src/ui`: Streamlit dashboard
-- `docs/mlops_beadando.md`: assignment documentation
-- `docs/rag_knowledge`: versioned explanation knowledge base
-
-Out of scope for this assignment:
-
-- `src/decision`
-- TOPSIS ranking
-- economic/social scoring
-- strategic portfolio prioritization
-- `notebooks/decision_model*`
+- portfolio decision scoring,
+- TOPSIS ranking,
+- economic or social scoring,
+- thesis notebooks and exploratory decision models.
 
 ## Core Valuation Logic
 
+The model learns relative structural scores derived from synthetic property data. These scores are combined with KSH benchmark values to estimate current and post-renovation market value scenarios.
+
+The KSH benchmark represents the current market price level:
+
 ```text
-ML model output = predicted structural asset value
-KSH baseline = KSH price/m2 * building area
-Market position ratio = predicted structural asset value / KSH baseline
+ksh_baseline_value_huf = ksh_price_m2 * building_area_m2
 ```
 
-The model estimates a structural asset-value proxy from property attributes.
-KSH price data remains a separate market benchmark. The dashboard compares the
-modelled asset value with the KSH benchmark instead of training on a KSH-divided
-modifier.
+The machine learning model does not directly learn the KSH benchmark and does not use the city-level market price as a feature. Instead, it learns two relative structural components from the dataframe:
 
-The renovated scenario first estimates renovation cost and target condition,
-then runs the asset-value model again for the post-renovation state. A business
-minimum rule prevents the renovated scenario from producing a lower asset value
-than the current scenario.
+```text
+land_structural_score = percentile_rank(land_value / land_area_m2)
+building_structural_score = percentile_rank((building_value + renovation_cost) / building_area_m2)
+```
 
-## Technology Stack
+The final structural score is calculated as:
 
-- Python
-- PostgreSQL
-- SQLAlchemy
-- scikit-learn
-- SHAP
-- Streamlit
-- Docker
+```text
+Apartment: structural_score = building_structural_score
+House:     structural_score = 0.3 * land_structural_score + 0.7 * building_structural_score
+```
+
+The predicted score modifies the KSH benchmark through a bounded adjustment factor:
+
+```text
+adjustment_factor = 0.80 + 0.40 * predicted_structural_score
+predicted_market_value = ksh_baseline_value_huf * adjustment_factor
+benchmark_delta = predicted_market_value - ksh_baseline_value_huf
+```
+
+This keeps the KSH benchmark as the market anchor while the ML model captures property-specific structural differences.
+
+## Post-renovation Scenario
+
+For the renovation scenario, the system predicts the structural score again with the target condition value. The renovated market value is then calculated using the same KSH benchmark and adjustment logic.
+
+The renovation cost calculation is kept as a supporting technical module, but it is not emphasized as a business KPI in the Streamlit interface because the synthetic cost scale can be unrealistic compared with the predicted value uplift.
 
 ## Project Structure
 
 ```text
-src/
-  data/
-  valuation/
-  rag/
-  ui/
-  decision/       # thesis scope, not current assignment scope
-
-data/
-docs/
-docker/
-notebooks/
-outputs/
+data/                  # input CSV files and processed exports
+docker/                # PostgreSQL docker compose configuration
+docs/                  # MLOps documentation and RAG knowledge base
+outputs/               # audit and demo outputs
+scripts/               # audit scripts
+src/data/              # SQL loaders and query helpers
+src/valuation/         # training, prediction, SHAP and renovation pipeline
+src/rag/               # textual explanation layer
+src/ui/                # Streamlit application
 ```
 
-## Run The Assignment Demo
+## Run the Project
+
+Create virtual environment and install dependencies:
+
+```powershell
+python -m venv venv
+venv\Scripts\python.exe -m pip install -r requirements.txt
+```
 
 Start PostgreSQL:
 
@@ -88,57 +95,108 @@ Start PostgreSQL:
 docker compose -f docker/docker-compose.yml up -d
 ```
 
-Load source data:
+Load data into SQL:
 
 ```powershell
-python src/data/load_synthetic.py
-python src/data/load_ksh_avg_prices
-python "src/data/load_renovation data.py"
-python src/data/load_ksh_social.py
+venv\Scripts\python.exe src\data\load_synthetic.py
+venv\Scripts\python.exe src\data\load_ksh_avg_prices
+venv\Scripts\python.exe "src\data\load_renovation data.py"
 ```
-
-`properties_synthetic` stores the base synthetic property data. The model learns
-two DF-derived relative structural targets: a land percentile score and a
-building percentile score within comparable county, settlement type and property
-type groups. KSH values are derived from `ksh_avg_prices` as benchmark outputs;
-they are not model features.
 
 Train the valuation model:
 
 ```powershell
-python src/valuation/train_model.py
+venv\Scripts\python.exe src\valuation\train_model.py
 ```
 
-Generate valuation outputs:
+Run the Streamlit app:
 
 ```powershell
-python src/run_full_pipeline.py
+venv\Scripts\python.exe -m streamlit run src\ui\streamlit_app.py --server.port 8502
 ```
 
-Run the Streamlit dashboard:
+## Versioning Strategy
 
-```powershell
-streamlit run src/ui/streamlit_app.py
-```
+Source code:
 
-The dashboard can also demonstrate from existing CSV exports in `outputs/`.
+- GitHub repository based source-code versioning,
+- Git commit based change tracking,
+- assignment scope separated from the broader thesis repository.
+
+Models:
+
+- reproducible training pipeline,
+- model artifacts regenerated by `src/valuation/train_model.py`,
+- model features and preprocessing stored with the trained pipeline,
+- audit metrics exported after training.
+
+Prompts and explanation rules:
+
+- RAG-style explanation rules stored in `docs/rag_knowledge/`,
+- explanation templates versioned through Git commits,
+- SHAP explanation code versioned with the valuation pipeline.
+
+Datasets:
+
+- synthetic input data stored under `data/synthetic/`,
+- KSH benchmark inputs stored under `data/external/ksh/`,
+- processed predictions and audit outputs stored under `data/processed/` and `outputs/`,
+- data loading logic versioned in `src/data/`.
+
+## Monitoring Strategy
+
+Model KPIs:
+
+- MAE,
+- RMSE,
+- R2,
+- MAPE,
+- prediction distribution by property type and condition.
+
+Data quality checks:
+
+- missing value ratios,
+- property type distribution,
+- settlement type and county distribution,
+- land area and building area distributions,
+- land value distribution,
+- renovation cost distribution,
+- KSH benchmark availability.
+
+Drift detection:
+
+- KSH benchmark changes,
+- feature distribution changes,
+- structural score distribution changes,
+- prediction distribution monitoring,
+- property type level comparison of apartment and house estimates.
+
+Retraining policy:
+
+- quarterly retraining in a production-like setting,
+- retraining after significant data drift,
+- retraining after KSH benchmark updates,
+- retraining after changes in synthetic data generation logic,
+- model replacement only after audit comparison with the previous version.
+
+## Audit Outputs
+
+The `outputs/` directory contains audit exports created during model validation:
+
+- valuation metrics and sample rows,
+- structural score distributions,
+- condition effect audit,
+- apartment versus house comparison,
+- land and building component audit,
+- raw factor distribution audit,
+- SHAP explanation export.
+
+These audit files support the MLOps assignment by documenting model behavior, assumptions and known limitations.
 
 ## Documentation
 
-The MLOps assignment documentation is in:
+Detailed MLOps documentation is available in:
 
 ```text
 docs/mlops_beadando.md
 ```
-
-It covers:
-
-- project description and architecture
-- training set description
-- code, model, data and prompt versioning
-- monitoring and logging
-- model KPIs
-- data quality checks
-- drift detection
-- retraining policy
-- explanation model replacement policy

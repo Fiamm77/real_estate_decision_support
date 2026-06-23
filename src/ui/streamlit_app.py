@@ -492,7 +492,7 @@ def predict_user_property(inputs: dict) -> pd.Series:
     decision_df = pd.DataFrame([row])
     decision_df = apply_minimum_renovation_uplift(
         decision_df,
-        target_condition=inputs["target_condition"],
+        inputs["target_condition"],
     )
     decision_df["renovated_market_value"] = decision_df[
         ["renovated_market_value", "predicted_market_value"]

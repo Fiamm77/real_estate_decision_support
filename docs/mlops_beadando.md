@@ -32,7 +32,7 @@ Ez a beadandó a diplomamunka projekt egy szűkített részét mutatja be. A dö
 
 1. Az ingatlan- és KSH-adatok CSV-fájlokból PostgreSQL adatbázisba kerülnek.
 2. A predikciós modell a strukturált ingatlanjellemzőkből külön telek- és épületkomponenst becsül, amelyekből strukturális score képződik.
-3. A KSH települési vagy területi fajlagos ár külön piaci benchmarkként jelenik meg. A modellkimenet és a KSH benchmark aránya interpretációs mutató, nem tanítási target.
+3. A KSH települési vagy területi fajlagos ár a KSH CSV-ből érkezik, és külön piaci benchmarkként jelenik meg. A rendszer ebből az ár/m² értékből és az ingatlan alapterületéből képezi az adott ingatlanra vonatkozó `ksh_baseline_value_huf` benchmarkot. A modellkimenet és a KSH benchmark aránya interpretációs mutató, nem tanítási target.
 4. A felújítás utáni szcenárióban a rendszer célállapotra újraprediktálja az ingatlan strukturális score-ját, majd újrabecsüli az ingatlan piaci értékét.
 5. A magyarázati réteg a predikciós eredményeket, SHAP-feature hatásokat és domain szabályokat kapcsol össze.
 6. A Streamlit felület a predikciókat, a felújítási szcenáriót és a magyarázatot jeleníti meg.
@@ -104,7 +104,14 @@ Lakóházaknál a végső score a telek- és épületscore súlyozott kombináci
 
 Lakások esetén az épületscore dominál.
 
-A KSH fajlagos áradataiból számolt `ksh_baseline_value_huf` piaci benchmarkként szolgál, amelyet a prediktált strukturális score korrigál.
+A KSH fajlagos áradata a `ksh_avg_prices` CSV-ből kerül be az SQL adatbázisba. A rendszer nem a KSH-árat becsüli, hanem az adott ingatlanhoz tartozó benchmark értéket számolja ki:
+
+```text
+ksh_baseline_value_huf =
+    ksh_price_m2 * building_area_m2
+```
+
+Ez a `ksh_baseline_value_huf` szolgál piaci benchmarkként, amelyet a prediktált strukturális score korrigál.
 
 ```text
 adjustment_factor = 0.80 + 0.40 * predicted_structural_score

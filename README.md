@@ -30,7 +30,9 @@ Out of scope:
 
 The model learns relative structural scores derived from synthetic property data. These scores are combined with KSH benchmark values to estimate current and post-renovation market value scenarios.
 
-The KSH benchmark represents the current market price level:
+The KSH price per square meter is loaded from the KSH CSV input. The system
+then derives the property-level benchmark by multiplying this reference price
+with the building area:
 
 ```text
 ksh_baseline_value_huf = ksh_price_m2 * building_area_m2

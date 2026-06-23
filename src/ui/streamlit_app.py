@@ -20,13 +20,15 @@ for import_path in [BASE_DIR, SRC_DIR]:
 from valuation.calculate_renovation_cost import calculate_renovation_cost
 from valuation.config import CONDITIONS_TABLE, KSH_AVG_PRICES_TABLE
 from valuation.core import read_table
-from valuation.pipeline import apply_minimum_renovation_uplift
 from valuation.predict_value import predict_property_value
 
 
 DECISION_DATASET_PATH = BASE_DIR / "outputs" / "decision_dataset.csv"
 SHAP_EXPLANATIONS_PATH = BASE_DIR / "outputs" / "shap_decision_explanations.csv"
 DEFAULT_TARGET_RENOVATION_CONDITION = 5
+MIN_SCORE_UPLIFT_PER_CONDITION_STEP = 0.05
+ADJUSTMENT_MIN = 0.80
+ADJUSTMENT_RANGE = 0.40
 
 
 st.set_page_config(
@@ -490,10 +492,30 @@ def predict_user_property(inputs: dict) -> pd.Series:
     }
 
     decision_df = pd.DataFrame([row])
-    decision_df = apply_minimum_renovation_uplift(
-        decision_df,
-        inputs["target_condition"],
-    )
+
+    if inputs["condition"] < inputs["target_condition"]:
+        condition_gap = inputs["target_condition"] - inputs["condition"]
+        minimum_score = min(
+            float(decision_df.loc[0, "predicted_structural_score"])
+            + condition_gap * MIN_SCORE_UPLIFT_PER_CONDITION_STEP,
+            1.0,
+        )
+        if minimum_score > float(decision_df.loc[0, "renovated_structural_score"]):
+            decision_df.loc[0, "renovated_structural_score"] = minimum_score
+            decision_df.loc[0, "renovated_adjustment_factor"] = (
+                ADJUSTMENT_MIN + ADJUSTMENT_RANGE * minimum_score
+            )
+            decision_df.loc[0, "renovated_market_value"] = round(
+                float(decision_df.loc[0, "renovated_ksh_baseline_value_huf"])
+                * float(decision_df.loc[0, "renovated_adjustment_factor"]),
+                0,
+            )
+            decision_df.loc[0, "renovated_benchmark_delta"] = round(
+                float(decision_df.loc[0, "renovated_market_value"])
+                - float(decision_df.loc[0, "renovated_ksh_baseline_value_huf"]),
+                0,
+            )
+
     decision_df["renovated_market_value"] = decision_df[
         ["renovated_market_value", "predicted_market_value"]
     ].max(axis=1)

@@ -188,8 +188,7 @@ def apply_minimum_renovation_uplift(
 ):
     decision_df = decision_df.copy()
     renovation_mask = (
-        (decision_df["total_cost"] > 0)
-        & (decision_df["renovation_possible"])
+        (decision_df["renovation_possible"])
         & (decision_df["condition"] < target_condition)
     )
     if not renovation_mask.any():

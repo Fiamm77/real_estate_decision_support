@@ -1,6 +1,6 @@
 """Lightweight retrieval-augmented explanations for valuation results.
 
-The module intentionally avoids an external LLM dependency for the beadando.
+The module intentionally avoids an external LLM dependency for the assignment.
 It retrieves short domain notes from versioned markdown files and combines
 them with model outputs and optional SHAP rows.
 """
@@ -78,13 +78,6 @@ def _format_huf(value) -> str:
         return "nem elérhető"
 
 
-def _format_ratio(value) -> str:
-    try:
-        return f"{float(value):.2f}x"
-    except (TypeError, ValueError):
-        return "nem elérhető"
-
-
 def _format_signed_huf(value) -> str:
     try:
         numeric = float(value)
@@ -93,6 +86,20 @@ def _format_signed_huf(value) -> str:
 
     sign = "+" if numeric >= 0 else "-"
     return f"{sign}{abs(numeric):,.0f} Ft".replace(",", " ")
+
+
+def _format_ratio(value) -> str:
+    try:
+        return f"{float(value):.2f}x"
+    except (TypeError, ValueError):
+        return "nem elérhető"
+
+
+def _format_score(value) -> str:
+    try:
+        return f"{float(value):.2f}"
+    except (TypeError, ValueError):
+        return "nem elérhető"
 
 
 def _normalise_shap_rows(shap_rows: pd.DataFrame | Iterable[dict] | None):
@@ -107,8 +114,49 @@ def _normalise_shap_rows(shap_rows: pd.DataFrame | Iterable[dict] | None):
     return sorted(rows, key=lambda row: abs(float(row.get("shap_value", 0))), reverse=True)
 
 
+def _estimate_shap_huf_effect(ksh_baseline, shap_value, adjustment_range=0.40):
+    try:
+        return float(ksh_baseline) * adjustment_range * float(shap_value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _context_summary(context: dict) -> str:
+    heading = context.get("heading", "Szabály")
+    summaries = {
+        "KSH piaci benchmark": (
+            "a KSH adja a piaci árszintet; hiányzó települési adatnál "
+            "területi fallbacket használunk."
+        ),
+        "Ketkomponensu strukturalt score": (
+            "a modell külön telek- és épületjelből becsül relatív "
+            "strukturális pozíciót."
+        ),
+        "KSH korrekcios faktor": (
+            "a strukturális score 0.80 és 1.20 közötti KSH-korrekciós "
+            "faktorrá alakul."
+        ),
+        "Benchmark elteres": (
+            "pozitív érték benchmark feletti, negatív érték benchmark alatti "
+            "strukturális pozíciót jelez."
+        ),
+        "Felujitas utani szcenario": (
+            "a célállapot mellett új score és új becsült piaci érték készül."
+        ),
+        "SHAP magyarazat": (
+            "a legerősebb lokális feature-hatások mutatják, mi tolta fel vagy "
+            "le a becslést."
+        ),
+        "Bizonytalansag": (
+            "a becslés bizonytalanabb, ha csak fallback KSH adat vagy "
+            "szokatlan bemenet áll rendelkezésre."
+        ),
+    }
+    return summaries.get(heading, str(context.get("text", "")).strip())
+
+
 def build_explanation(property_row: dict, shap_rows=None, top_k: int = 1) -> str:
-    """Build a concise Hungarian explanation for one property valuation."""
+    """Build a short Hungarian bullet-list explanation for one valuation."""
 
     query = " ".join(
         [
@@ -123,40 +171,46 @@ def build_explanation(property_row: dict, shap_rows=None, top_k: int = 1) -> str
 
     market_value = _format_huf(property_row.get("predicted_market_value"))
     ksh_baseline = _format_huf(property_row.get("ksh_baseline_value_huf"))
-    structural_score = _format_ratio(property_row.get("predicted_structural_score"))
+    structural_score = _format_score(property_row.get("predicted_structural_score"))
     adjustment_factor = _format_ratio(property_row.get("adjustment_factor"))
-    benchmark_delta = _format_huf(property_row.get("benchmark_delta"))
+    benchmark_delta = _format_signed_huf(property_row.get("benchmark_delta"))
     renovated_value = _format_huf(property_row.get("renovated_market_value"))
-    uplift = _format_huf(property_row.get("value_uplift"))
+    uplift = _format_signed_huf(property_row.get("value_uplift"))
     source_level = property_row.get("ksh_source_level", "nem elérhető")
     ksh_baseline_raw = property_row.get("ksh_baseline_value_huf")
-    adjustment_range = 0.40
 
     lines = [
-        "A becslés két részből áll: a KSH benchmark adja az aktuális piaci árszintet, a modell pedig a DF-ből tanult strukturális score alapján korrigálja ezt.",
-        f"A becsült piaci érték {market_value}, a KSH piaci benchmark {ksh_baseline}.",
-        f"A prediktált strukturális score {structural_score}, a KSH korrekciós faktor {adjustment_factor}.",
-        f"A benchmarkhoz képesti eltérés {benchmark_delta}, a KSH árforrás szintje: {source_level}.",
-        f"A célállapot szerinti becsült piaci érték {renovated_value}, az értéknövekmény {uplift}.",
+        f"- **Becsült piaci érték:** {market_value}.",
+        f"- **KSH benchmark:** {ksh_baseline}; forrásszint: `{source_level}`.",
+        (
+            "- **Strukturális korrekció:** "
+            f"score `{structural_score}`, faktor `{adjustment_factor}`, "
+            f"benchmark eltérés {benchmark_delta}."
+        ),
+        (
+            "- **Felújítás utáni scenario:** "
+            f"becsült érték {renovated_value}, értéknövekmény {uplift}."
+        ),
     ]
 
     if shap_items:
-        lines.append("A lokális SHAP magyarázat legerősebb tényezői:")
+        lines.append("- **Lokális SHAP tényezők:**")
         for item in shap_items:
             shap_value = float(item.get("shap_value", 0))
             direction = "növelte" if shap_value >= 0 else "csökkentette"
             feature = item.get("feature", "ismeretlen feature")
             value = item.get("feature_value", "n/a")
             estimated_huf_effect = _format_signed_huf(
-                float(ksh_baseline_raw) * adjustment_range * shap_value
+                _estimate_shap_huf_effect(ksh_baseline_raw, shap_value)
             )
             lines.append(
-                f'- "{feature}" = {value}: {direction} a becslést, becsült hatása {estimated_huf_effect}.'
+                f'  - "{feature}" = {value}: {direction} a becslést, '
+                f"becsült hatása {estimated_huf_effect}."
             )
 
     if contexts:
-        lines.append("Rövid értelmezési háttér:")
+        lines.append("- **RAG értelmezési szabály:**")
         for context in contexts:
-            lines.append(f"- {context['heading']}: {context['text']}")
+            lines.append(f"  - {context['heading']}: {_context_summary(context)}")
 
     return "\n".join(lines)

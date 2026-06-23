@@ -92,7 +92,11 @@ A predikciós modell egy scikit-learn pipeline:
 
 * medián imputálás numerikus változókra,
 * RandomForestRegressor regressziós modell,
-* mentett modellfájl: `models/valuation_model.pkl`.
+* lokálisan generált modellfájl: `models/valuation_model.pkl`.
+
+A modellfájl a training futtatásakor jön létre. A GitHub repository nem
+verziózza a bináris modell artifactot, mert az újragenerálható a
+`src/valuation/train_model.py` futtatásával.
 
 A modell két komponenst tanul a tanítóadatokból: egy telekhez és egy épülethez kapcsolódó strukturális score-t.
 
@@ -137,7 +141,12 @@ A szintetikus tanítóadatok minőségét külön statisztikai audit ellenőrizt
 
 ### Modell
 
-A modell artifact a `models/` könyvtárba kerül.
+A modell artifact lokálisan a `models/` könyvtárba kerül.
+
+A beadandó GitHub repositoryban a bináris modellfájl nincs verziózva
+(`models/*.pkl` szerepel a `.gitignore` fájlban). A modell reprodukálhatóságát
+a verziózott training script, a verziózott bemeneti adatok és a dokumentált
+futtatási lépések biztosítják.
 
 Éles működésben minden modellhez tárolandó:
 

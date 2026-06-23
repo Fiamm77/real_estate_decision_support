@@ -1,271 +1,285 @@
-# MLOps beadando scope
+# MLOps beadandó scope
 
-## Projekt celja
+## Projekt célja
 
-A beadando celja egy MI-alapu ingatlanertek-becslo rendszer bemutatasa, amely
-SQL-ben kezelt ingatlanadatokbol aktualis piaci erteket es felujitas utani
-piaci erteket prediktal. A predikciokhoz magyarazhato kimenet keszul SHAP
-eredmenyekbol es RAG-szeru, domain tudasbazisra tamaszkodo szoveges
-indoklasbol.
+A beadandó célja egy MI-alapú ingatlanérték-becslő rendszer bemutatása, amely SQL-ben kezelt ingatlanadatokból aktuális piaci értéket és felújítás utáni piaci értéket prediktál. A predikciókhoz magyarázható kimenet készül SHAP-eredményekből és RAG-szerű, domain tudásbázisra támaszkodó szöveges indoklásból.
 
-Ez a beadando a diplomamunka repojanak egy szukitett resze. A dontesi
-rangsorolas, TOPSIS scoring es portfoliopriorizalas a diplomamunka kesobbi
-resze, nem tartozik a jelen beadando scope-jaba.
+Ez a beadandó a diplomamunka projekt egy szűkített részét mutatja be. A döntési rangsorolás, TOPSIS scoring és portfóliópriorizálás a diplomamunka későbbi része, nem tartozik a jelen beadandó scope-jába.
+
+---
 
 ## Scope
 
-Beletartozik:
+### Beletartozik
 
-- SQL-alapu adatkezeles PostgreSQL es SQLAlchemy hasznalataval.
-- Aktualis ingatlanertek predikcioja.
-- Felujitas utani ingatlanertek predikcioja.
-- SHAP-alapu lokalis magyarazatok.
-- RAG-szeru szoveges magyarazat domain szabalyok es modellkimenetek alapjan.
-- Streamlit alapu megjelenites.
-- MLOps dokumentacio: verziozas, monitoring, KPI-k, retraining.
+* SQL-alapú adatkezelés PostgreSQL és SQLAlchemy használatával.
+* Aktuális ingatlanérték predikciója.
+* Felújítás utáni ingatlanérték predikciója.
+* SHAP-alapú lokális magyarázatok.
+* RAG-szerű szöveges magyarázat domain szabályok és modellkimenetek alapján.
+* Streamlit alapú megjelenítés.
+* MLOps dokumentáció: verziózás, monitoring, KPI-k, retraining.
 
-Nem tartozik bele:
+### Nem tartozik bele
 
-- TOPSIS dontesi scoring.
-- Gazdasagi es tarsadalmi dontesi rangsorolas.
-- Strategiai portfoliokezeles.
+* TOPSIS döntési scoring.
+* Gazdasági és társadalmi döntési rangsorolás.
+* Stratégiai portfóliókezelés.
 
-## Architektura
+---
 
-1. Az ingatlan- es KSH adatok CSV fajlokbol PostgreSQL tablaba
-   kerulnek.
-2. A predikcios modell a strukturalt ingatlanjellemzokbol becsul egy
-   asset ertekproxyt.
-3. A KSH telepulesi vagy teruleti fajlagos ar kulon piaci benchmarkkent
-   jelenik meg. A modellkimenet es a KSH benchmark aranya interpretacios
-   mutato, nem tanitasi target.
-4. A felujitas utani szcenarioban a rendszer celallapotra ujraprediktalja
-   az ingatlan strukturalt score-jat, majd ujra becsli az ingatlan erteket.
-5. A magyarazati reteg a predikcios eredmenyeket, SHAP feature hatasokat es
-   domain szabalyokat kapcsol ossze.
-6. A Streamlit felulet a predikciokat, felujitasi szcenariot es magyarazatot
-   jeleniti meg.
+## Architektúra
+
+1. Az ingatlan- és KSH-adatok CSV-fájlokból PostgreSQL adatbázisba kerülnek.
+2. A predikciós modell a strukturált ingatlanjellemzőkből külön telek- és épületkomponenst becsül, amelyekből strukturális score képződik.
+3. A KSH települési vagy területi fajlagos ár külön piaci benchmarkként jelenik meg. A modellkimenet és a KSH benchmark aránya interpretációs mutató, nem tanítási target.
+4. A felújítás utáni szcenárióban a rendszer célállapotra újraprediktálja az ingatlan strukturális score-ját, majd újrabecsüli az ingatlan piaci értékét.
+5. A magyarázati réteg a predikciós eredményeket, SHAP-feature hatásokat és domain szabályokat kapcsol össze.
+6. A Streamlit felület a predikciókat, a felújítási szcenáriót és a magyarázatot jeleníti meg.
+
+---
 
 ## Training set
 
-A tanito adatbazis SQL-ben tarolt szintetikus ingatlanadatokra epul. A
-`properties_synthetic` tabla az alap ingatlanadatokat tartalmazza, a
-`ksh_avg_prices` tabla pedig a telepulesi es teruleti KSH arakat. A training
-folyamat ezekbol kepez tanito nezetet.
+A tanító adatbázis SQL-ben tárolt szintetikus ingatlanadatokra épül. A `properties_synthetic` tábla az alap ingatlanadatokat tartalmazza, a `ksh_avg_prices` tábla pedig a települési és területi KSH-árakat. A training folyamat ezekből képez tanító nézetet.
 
-- ingatlan azonosito,
-- ingatlan tipusa,
-- telepules, varmegye, telepulestipus,
-- telekmeret,
-- epulethasznos alapterulet,
-- allapot,
-- becsult epuletertek,
-- telekertek,
-- korabbi felujitasi koltseg.
+A tanítóadatok tartalmazzák többek között:
 
-Ket celvaltozo kepzodik dinamikusan, mindketto csoporton beluli percentile
-rank formajaban:
+* ingatlan azonosító,
+* ingatlan típusa,
+* település, vármegye, településtípus,
+* telekméret,
+* épület hasznos alapterület,
+* állapot,
+* becsült épületérték,
+* telekérték,
+* korábbi felújítási költség.
+
+A korábbi felújítási költség nem bemeneti feature, hanem a strukturális score képzésének egyik alapadata.
+
+Két célváltozó képződik dinamikusan, mindkettő csoporton belüli percentile rank formájában:
 
 ```text
 land_structural_score =
-    percentile_rank(land_value / land_area_m2 within county + settlement_type + property_type)
+    percentile_rank(land_value / land_area_m2
+                    within county + settlement_type + property_type)
 
 building_structural_score =
     percentile_rank((building_value + renovation_cost) / building_area_m2
                     within county + settlement_type + property_type)
 ```
 
-A training sorokbol kiszuresre kerulnek a hianyos vagy irrealis rekordok,
-peldaul a nulla vagy hianyzo alapterulet, a nulla epuletertek proxy, vagy a
-nulla KSH benchmark.
+A training sorokból kiszűrésre kerülnek a hiányos vagy irreális rekordok, például a nulla vagy hiányzó alapterület, a nulla épületérték-proxy vagy a nulla KSH benchmark.
 
 A modell jelenlegi feature halmaza:
 
-- `property_type`
-- `settlement_type`
-- `county`
-- `land_area_m2`
-- `building_area_m2`
-- `condition`
+* property_type
+* settlement_type
+* county
+* land_area_m2
+* building_area_m2
+* condition
 
-Nem modell feature a `city`, mert a telepulesi piaci szintet a KSH benchmark
-kezeli. Nem feature az `annual_cost`, valamint a `building_value`,
-`land_value`, `renovation_cost`, `activation_year` es KSH baseline mezok sem,
-mert ezek target, benchmark vagy az aktualis modellbol kizart mezok.
+Nem modell feature a `city`, mert a települési piaci szintet a KSH benchmark kezeli.
+
+Nem feature az `annual_cost`, valamint a `building_value`, `land_value`, `renovation_cost`, `activation_year` és KSH benchmark mezők sem, mert ezek target, benchmark vagy a jelenlegi modellből kizárt változók.
+
+---
 
 ## Modell
 
-A predikcios modell egy scikit-learn pipeline:
+A predikciós modell egy scikit-learn pipeline:
 
-- median imputalas numerikus valtozokra,
-- RandomForestRegressor regresszios modell,
-- mentett modell fajl: `models/valuation_model.pkl`.
+* medián imputálás numerikus változókra,
+* RandomForestRegressor regressziós modell,
+* mentett modellfájl: `models/valuation_model.pkl`.
 
-A modell ket komponenst tanul a DF-bol: telekhez es epülethez kapcsolodo
-strukturalt percentile score-t. Lakohazaknal a vegso score a telek es epület
-score sulyozott atlaga, lakasoknal az epület score dominans. A KSH
-fajlagos aradatokbol szamolt `ksh_baseline_value_huf` piaci benchmark, amelyet
-a prediktalt strukturalt score korrigal.
+A modell két komponenst tanul a tanítóadatokból: egy telekhez és egy épülethez kapcsolódó strukturális score-t.
+
+Lakóházaknál a végső score a telek- és épületscore súlyozott kombinációja. Az auditok alapján a telekkomponens hatása jelenleg korlátozott, ezért a score-t elsősorban az épületkomponens befolyásolja.
+
+Lakások esetén az épületscore dominál.
+
+A KSH fajlagos áradataiból számolt `ksh_baseline_value_huf` piaci benchmarkként szolgál, amelyet a prediktált strukturális score korrigál.
 
 ```text
 adjustment_factor = 0.80 + 0.40 * predicted_structural_score
-predicted_market_value = ksh_baseline_value_huf * adjustment_factor
-benchmark_delta = predicted_market_value - ksh_baseline_value_huf
+
+predicted_market_value =
+    ksh_baseline_value_huf * adjustment_factor
+
+benchmark_delta =
+    predicted_market_value - ksh_baseline_value_huf
 ```
 
-## MLOps verziozas
+---
 
-### Forraskod
+## MLOps verziózás
 
-A forraskod Git repoban van tarolva. A beadando szempontjabol kulon kezelendo
-modulok:
+### Forráskód
 
-- `src/valuation`: predikcio es felujitas utani ertekbecsles,
-- `src/data`: SQL adatbetoltes,
-- `src/rag`: magyarazati reteg,
-- `src/ui`: Streamlit felulet.
+A forráskód Git repositoryban van tárolva.
+
+A beadandó szempontjából releváns modulok:
+
+* `src/valuation` – predikció és felújítás utáni értékbecslés,
+* `src/data` – SQL adatbetöltés,
+* `src/rag` – magyarázati réteg,
+* `src/ui` – Streamlit felület.
 
 ### Adatok
 
-Az adatverziok fajlszintu verziozasa a `data/` konyvtarban tortenik. Nagyobb
-eles rendszerben DVC vagy objektumtar hasznalata lenne indokolt, ahol minden
-tanito adatverzio hash-sel es metadata rekorddal azonosithato.
+Az adatverziók fájlszintű verziózása a `data/` könyvtárban történik.
+
+Nagyobb éles rendszerben DVC vagy objektumtár használata lenne indokolt, ahol minden tanítóadat-verzió hash-sel és metaadatokkal azonosítható.
+
+A szintetikus tanítóadatok minőségét külön statisztikai audit ellenőrizte. Az audit során az eredeti és a szintetikus adatok eloszlásai, percentilisei és főbb kapcsolatai kerültek összehasonlításra.
 
 ### Modell
 
-A modell artifact a `models/` konyvtarba kerul. Eles mukodesben minden modellhez
-tarolando:
+A modell artifact a `models/` könyvtárba kerül.
 
-- tanito adat verzioja,
-- training script commit hash,
-- metrikak,
-- tanitas datuma,
-- feature lista,
-- Python es csomagverziok.
+Éles működésben minden modellhez tárolandó:
 
-### Promptok es RAG tudasbazis
+* tanítóadat verziója,
+* training script commit hash,
+* metrikák,
+* tanítás dátuma,
+* feature lista,
+* Python- és csomagverziók.
 
-A jelenlegi beadandoban a magyarazati reteg determinisztikus RAG-szeru
-sablonokkal dolgozik. A tudasbazis a `docs/rag_knowledge/` konyvtarban
-verziozott markdown fajlokbol all.
+### Promptok és RAG tudásbázis
 
-Ha kesobb LLM is bekerul, minden prompt verziot kulon fajlban kell tarolni,
-peldaul:
+A jelenlegi beadandóban a magyarázati réteg determinisztikus, RAG-szerű sablonokkal dolgozik.
 
-- `prompts/explanation_v1.md`
-- `prompts/explanation_v2.md`
+A tudásbázis a `docs/rag_knowledge/` könyvtárban verziózott markdown-fájlokból áll.
+
+Ha később LLM is bekerül, minden promptverzió külön fájlban tárolandó, például:
+
+* `prompts/explanation_v1.md`
+* `prompts/explanation_v2.md`
+
+---
 
 ## Monitoring
 
 ### Modell KPI-k
 
-Javasolt offline metrikak:
+Javasolt offline metrikák:
 
-- MAE: atlagos abszolut hiba forintban,
-- RMSE: nagy hibakra erzekeny regresszios mutato,
-- MAPE: relativ hiba,
-- R2: magyarazoero,
-- predikcios hibak varmegye es ingatlantipus szerint.
+* MAE (Mean Absolute Error),
+* RMSE (Root Mean Squared Error),
+* MAPE (Mean Absolute Percentage Error),
+* R²,
+* predikciós hibák vármegye és ingatlantípus szerint.
 
-### Adatminosegi KPI-k
+### Adatminőségi KPI-k
 
-Figyelendo:
+Figyelendő:
 
-- hianyzo ertekek aranya,
-- negativ vagy nulla alapterulet,
-- irrealis eves koltseg,
-- ismeretlen telepules vagy varmegye,
-- KSH aradat hianya,
-- allapot skalan kivuli ertek.
+* hiányzó értékek aránya,
+* negatív vagy nulla alapterület,
+* irreális éves költség,
+* ismeretlen település vagy vármegye,
+* KSH-áradat hiánya,
+* állapotskálán kívüli érték.
 
 ### Drift KPI-k
 
-Figyelendo eloszlasvaltozasok:
+Figyelendő eloszlásváltozások:
 
-- alapterulet eloszlas,
-- allapot eloszlas,
-- eves koltseg eloszlas,
-- KSH fajlagos arak eloszlasa,
-- predicted asset ertek eloszlasa,
-- KSH benchmark eloszlasa,
-- market position ratio eloszlasa,
-- prediktalt ertekek eloszlasa.
+* alapterület eloszlás,
+* állapot eloszlás,
+* éves költség eloszlás,
+* KSH fajlagos árak eloszlása,
+* prediktált strukturális score eloszlása,
+* KSH benchmark eloszlása,
+* market position ratio eloszlása,
+* prediktált piaci értékek eloszlása.
 
-### Monitoring gyakorisag
+### Monitoring gyakoriság
 
-Beadando/demo kornyezetben:
+Beadandó/demo környezetben:
 
-- minden batch futas utan alap adatminosegi riport,
-- minden uj tanitas utan modellmetrika riport.
+* minden batch futás után alap adatminőségi riport,
+* minden új tanítás után modellmetrika riport.
 
-Eles kornyezetben:
+Éles környezetben:
 
-- napi adatminosegi ellenorzes,
-- heti drift riport,
-- havi modell teljesitmeny review,
-- ujratanitas trigger jelentosebb drift vagy romlo pontossag eseten.
+* napi adatminőségi ellenőrzés,
+* heti drift riport,
+* havi modellteljesítmény-review,
+* újratanítás trigger jelentősebb drift vagy romló pontosság esetén.
 
-## Adatminosegi problema kezelese
+---
 
-Ha adatminosegi problema merul fel:
+## Adatminőségi probléma kezelése
 
-1. A rekord validacios figyelmeztetest kap.
-2. Kritikus hiba eseten a rekord kimarad a predikciobol.
-3. Nem kritikus hiba eseten imputalas vagy fallback logika fut.
-4. A hiba bekerul a monitoring riportba.
-5. Ismetlodo problema eseten adatforras oldali javitas szukseges.
+Ha adatminőségi probléma merül fel:
+
+1. A rekord validációs figyelmeztetést kap.
+2. Kritikus hiba esetén a rekord kimarad a predikcióból.
+3. Nem kritikus hiba esetén imputálás vagy fallback logika fut.
+4. A hiba bekerül a monitoring riportba.
+5. Ismétlődő probléma esetén adatforrás oldali javítás szükséges.
+
+---
 
 ## Retraining
 
-Ujratanitas akkor indokolt, ha:
+Újratanítás akkor indokolt, ha:
 
-- uj ingatlanadat-verzio erkezik,
-- a KSH piaci arak jelentosen valtoznak,
-- drift detektalhato a bemeneti eloszlasokban,
-- a validacios MAE vagy MAPE romlik,
-- uj feature kerul be a modellbe.
+* új ingatlanadat-verzió érkezik,
+* a KSH piaci árak jelentősen változnak,
+* drift detektálható a bemeneti eloszlásokban,
+* a validációs MAE vagy MAPE romlik,
+* új feature kerül be a modellbe.
 
 Javasolt retraining folyamat:
 
-1. adatverzio rogzites,
-2. training script futtatasa,
-3. metrikak exportalasa,
-4. modell artifact mentese,
-5. elozo modellhez viszonyitott osszehasonlitas,
-6. jovahagyas utan modellcsere.
+1. adatverzió rögzítése,
+2. training script futtatása,
+3. metrikák exportálása,
+4. modell artifact mentése,
+5. előző modellhez viszonyított összehasonlítás,
+6. jóváhagyás után modellcsere.
 
-## LLM vagy magyarazati modell csereje
+---
 
-Ha kesobb LLM-alapu magyarazat kerul be:
+## LLM vagy magyarázati modell cseréje
 
-- a promptokat verziozni kell,
-- a RAG dokumentumokat verziozni kell,
-- regresszios tesztkerdeseket kell fenntartani,
-- a valaszokat szakmai es stilusbeli szempontbol ellenorizni kell,
-- modellcsere csak osszehasonlito ertekeles utan tortenhet.
+Ha később LLM-alapú magyarázat kerül be:
 
-## Futtatas
+* a promptokat verziózni kell,
+* a RAG dokumentumokat verziózni kell,
+* regressziós tesztkérdéseket kell fenntartani,
+* a válaszokat szakmai és stilisztikai szempontból ellenőrizni kell,
+* modellcsere csak összehasonlító értékelés után történhet.
 
-Adatbazis inditasa:
+---
+
+## Futtatás
+
+### Adatbázis indítása
 
 ```powershell
 docker compose -f docker/docker-compose.yml up -d
 ```
 
-Adatok betoltese:
+### Adatok betöltése
 
 ```powershell
 python src/data/load_synthetic.py
 python src/data/load_ksh_avg_prices.py
 ```
 
-Modell tanitasa:
+### Modell tanítása
 
 ```powershell
 python src/valuation/train_model.py
 ```
 
-Streamlit felulet:
+### Streamlit felület
 
 ```powershell
 streamlit run src/ui/streamlit_app.py

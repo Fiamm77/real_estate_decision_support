@@ -132,7 +132,15 @@ def _context_summary(context: dict) -> str:
             "a modell külön telek- és épületjelből becsül relatív "
             "strukturális pozíciót."
         ),
+        "Kétkomponensű strukturális score": (
+            "a modell külön telek- és épületjelből becsül relatív "
+            "strukturális pozíciót."
+        ),
         "KSH korrekcios faktor": (
+            "a strukturális score 0.80 és 1.20 közötti KSH-korrekciós "
+            "faktorrá alakul."
+        ),
+        "KSH-korrekciós faktor": (
             "a strukturális score 0.80 és 1.20 közötti KSH-korrekciós "
             "faktorrá alakul."
         ),
@@ -140,14 +148,29 @@ def _context_summary(context: dict) -> str:
             "pozitív érték benchmark feletti, negatív érték benchmark alatti "
             "strukturális pozíciót jelez."
         ),
+        "Benchmark-eltérés": (
+            "pozitív érték benchmark feletti, negatív érték benchmark alatti "
+            "strukturális pozíciót jelez."
+        ),
         "Felujitas utani szcenario": (
+            "a célállapot mellett új score és új becsült piaci érték készül."
+        ),
+        "Felújítás utáni szcenárió": (
             "a célállapot mellett új score és új becsült piaci érték készül."
         ),
         "SHAP magyarazat": (
             "a legerősebb lokális feature-hatások mutatják, mi tolta fel vagy "
             "le a becslést."
         ),
+        "SHAP-magyarázat": (
+            "a legerősebb lokális feature-hatások mutatják, mi tolta fel vagy "
+            "le a becslést."
+        ),
         "Bizonytalansag": (
+            "a becslés bizonytalanabb, ha csak fallback KSH adat vagy "
+            "szokatlan bemenet áll rendelkezésre."
+        ),
+        "Bizonytalanság": (
             "a becslés bizonytalanabb, ha csak fallback KSH adat vagy "
             "szokatlan bemenet áll rendelkezésre."
         ),
